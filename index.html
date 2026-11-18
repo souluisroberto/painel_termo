@@ -1,0 +1,1541 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Painel Operacional CD - Análise de XML</title>
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Fonte Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+          colors: {
+            navy: {
+              900: '#173376',
+              800: '#1e3f8f',
+              700: '#274ea8',
+            },
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    body {
+      background-color: #eef2f6;
+      color: #0f172a;
+    }
+    .cd-card {
+      background-color: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.07);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      height: 100%;
+    }
+    .cd-panel-header {
+      background: linear-gradient(180deg, #1e3f8f 0%, #173376 100%);
+      color: #ffffff;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+    }
+    .cd-header-control {
+      background-color: #ffffff;
+      color: #0f172a;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      height: 28px;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 0 8px;
+      outline: none;
+      transition: box-shadow 0.15s ease, border-color 0.15s ease;
+      max-width: 100%;
+    }
+    .cd-header-control:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.35);
+    }
+    .cd-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background-color: #1e3f8f;
+      color: #ffffff;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      padding: 8px 8px;
+      border-right: 1px solid rgba(255, 255, 255, 0.2);
+      border-bottom: 1px solid #173376;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .cd-table thead th:last-child {
+      border-right: none;
+    }
+    .cd-table thead th.sortable {
+      cursor: pointer;
+    }
+    .cd-table thead th.sortable:hover {
+      background-color: #274ea8;
+    }
+    .cd-table tbody td {
+      padding: 7px 8px;
+      font-size: 12px;
+      color: #0f172a;
+      border-bottom: 1px solid #e2e8f0;
+      border-right: 1px solid #f1f5f9;
+      font-variant-numeric: tabular-nums;
+    }
+    .cd-table tbody td:last-child {
+      border-right: none;
+    }
+    .cd-table tbody tr:nth-child(even) {
+      background-color: #f8fafc;
+    }
+    .cd-table tbody tr:hover {
+      background-color: #eff6ff;
+    }
+    .four-panels-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(280px, 1fr));
+      gap: 14px;
+      height: calc(100vh - 130px);
+      min-height: 500px;
+    }
+    @keyframes spin-slow {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes spin-fast-once {
+      0% { transform: rotate(0deg) scale(0.8); opacity: 0; }
+      50% { transform: rotate(360deg) scale(1.1); opacity: 1; }
+      100% { transform: rotate(720deg) scale(1); opacity: 1; }
+    }
+    .animate-spin-slow {
+      animation: spin-slow 3s linear infinite;
+    }
+    .group:hover .group-hover-spin {
+      animation: spin-slow 2.5s linear infinite;
+    }
+    .animate-spin-error {
+      animation: spin-fast-once 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    .print-header-only {
+      display: none;
+    }
+
+    #printRelatorioCapContainer {
+      display: none;
+    }
+
+    /* IMPRESSÃO RELATÓRIO CAP - PAISAGEM (HORIZONTAL), 1 PÁGINA EXATA */
+    @media print {
+      @page {
+        size: A4 landscape;
+        margin: 3mm;
+      }
+      html, body.imprimindo-cap {
+        width: 100% !important;
+        height: 100% !important;
+        background: #ffffff !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        overflow: hidden !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      body.imprimindo-cap > div:not(#printRelatorioCapContainer) {
+        display: none !important;
+      }
+      body.imprimindo-cap #printRelatorioCapContainer {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        height: 100vh !important;
+        background: #ffffff !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        box-sizing: border-box !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+    }
+
+    /* IMPRESSÃO TOP 20 - 1 PÁGINA ÚNICA COMPACTADA */
+    @media print {
+      body.imprimindo-top20 {
+        background: #ffffff !important;
+        padding: 6mm !important;
+        margin: 0 !important;
+        height: auto !important;
+        overflow: visible !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      body.imprimindo-top20 > div:not(#painelPrincipalContainer) {
+        display: none !important;
+      }
+      body.imprimindo-top20 #painelPrincipalContainer {
+        min-width: 100% !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        gap: 0 !important;
+      }
+      body.imprimindo-top20 header,
+      body.imprimindo-top20 .four-panels-grid > section:not(#secaoPainel1) {
+        display: none !important;
+      }
+      body.imprimindo-top20 .four-panels-grid {
+        display: block !important;
+        height: auto !important;
+        min-height: 0 !important;
+      }
+      body.imprimindo-top20 #secaoPainel1 {
+        border: 1px solid #cbd5e1 !important;
+        box-shadow: none !important;
+        width: 100% !important;
+        height: auto !important;
+        overflow: visible !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+      body.imprimindo-top20 #secaoPainel1 > div.overflow-y-auto {
+        overflow: visible !important;
+        height: auto !important;
+      }
+      body.imprimindo-top20 #secaoPainel1 .cd-panel-header {
+        display: none !important;
+      }
+      body.imprimindo-top20 .print-header-only {
+        display: block !important;
+        text-align: center;
+        margin-bottom: 6px;
+        padding: 4px 6px;
+        border-bottom: 2px solid #173376;
+      }
+      body.imprimindo-top20 #secaoPainel1 .cd-table thead th {
+        position: static !important;
+        padding: 5px 6px !important;
+        font-size: 10px !important;
+      }
+      body.imprimindo-top20 #secaoPainel1 .cd-table tbody td {
+        padding: 4.5px 6px !important;
+        font-size: 11px !important;
+        line-height: 1.15 !important;
+      }
+    }
+
+    /* ESTILOS IDÊNTICOS À IMAGEM DO RELATÓRIO CAP */
+    .report-container {
+      width: 100%;
+      height: 100%;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #000000;
+    }
+    .capital-title {
+      flex: 0 0 auto;
+      text-align: center;
+      font-weight: 800;
+      font-size: 14px;
+      line-height: 1.2;
+      margin-bottom: 2px;
+      text-transform: uppercase;
+      color: #000000;
+    }
+    .report-header-box {
+      flex: 0 0 auto;
+      display: flex;
+      background-color: #000000 !important;
+      color: #ffffff !important;
+      align-items: center;
+      justify-content: center;
+      border: 1.5px solid #000000;
+      margin-bottom: 4px;
+      height: 24px;
+      font-weight: 700;
+      font-size: 11px;
+      letter-spacing: 0.4px;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .report-grid {
+      flex: 1 1 auto;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      grid-template-rows: repeat(2, 1fr);
+      gap: 4px;
+      min-height: 0;
+    }
+    .route-table-box {
+      border: 1.5px solid #000000;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      min-height: 0;
+      box-sizing: border-box;
+    }
+    .route-header {
+      flex: 0 0 auto;
+      background-color: #000000 !important;
+      color: #ffffff !important;
+      text-align: center;
+      font-weight: 700;
+      font-size: 9px;
+      padding: 2px 0;
+      border-bottom: 1px solid #000000;
+      letter-spacing: 0.4px;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .report-table {
+      flex: 1 1 auto;
+      width: 100%;
+      height: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    .report-table th,
+    .report-table td {
+      border: 1px solid #000000;
+      text-align: center;
+      font-size: 8px;
+      padding: 0 1px;
+      vertical-align: middle;
+      overflow: hidden;
+      white-space: nowrap;
+      color: #000000;
+    }
+    .report-table th {
+      background-color: #ffffff !important;
+      color: #000000 !important;
+      font-weight: 700;
+      font-size: 7.5px;
+      height: 16px;
+    }
+    .col-filial { width: 32%; }
+    .col-caixas { width: 23%; }
+    .col-obs { width: 45%; }
+    .signature-box {
+      flex: 0 0 auto;
+      border-top: 1px solid #000000;
+      padding: 2px 4px 3px 4px;
+      text-align: center;
+      background-color: #000000 !important;
+      color: #ffffff !important;
+      font-size: 7.5px;
+      font-weight: 700;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .signature-line {
+      background-color: #ffffff !important;
+      height: 20px;
+      border: 1px solid #000000;
+      margin-top: 2px;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .doc-footer {
+      flex: 0 0 auto;
+      margin-top: 3px;
+      text-align: center;
+      font-size: 7.5px;
+      font-weight: 700;
+      color: #000000;
+      border-top: 1px dashed #000000;
+      padding-top: 2px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+  </style>
+</head>
+<body class="font-sans antialiased p-3 overflow-x-auto">
+
+  <!-- INPUT DE ARQUIVO ÚNICO -->
+  <input type="file" id="xmlInput" accept=".xml,text/xml" class="hidden" />
+
+  <!-- TELA CENTRAL VERDE (BLOQUEIO INICIAL + PROGRESSO DO XML POR CIMA DO VERDE) -->
+  <div id="uploadLockOverlay" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex flex-col items-center justify-center p-4">
+    <div class="flex flex-col items-center gap-2">
+      <div
+        id="btnUploadInicial"
+        role="button"
+        tabindex="0"
+        onclick="if(!isCarregandoXml) document.getElementById('xmlInput').click()"
+        onkeydown="if((event.key==='Enter'||event.key===' ') && !isCarregandoXml) document.getElementById('xmlInput').click()"
+        class="group relative w-72 h-72 rounded-3xl bg-[#059669] hover:bg-emerald-600 text-white border-4 border-emerald-300/60 shadow-[0_20px_50px_rgba(5,150,105,0.45)] flex flex-col items-center justify-center gap-3 p-6 transition-all duration-200 cursor-pointer select-none"
+        title="Clique para selecionar o arquivo XML"
+      >
+        <!-- ESTADO 1: AGUARDANDO UPLOAD -->
+        <div id="estadoUploadIdle" class="flex flex-col items-center justify-center gap-3 w-full">
+          <div class="relative flex items-center justify-center w-24 h-24 rounded-2xl bg-white/15 border border-white/30 shadow-inner">
+            <svg class="w-16 h-16 text-white/95 animate-spin-slow" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v18m9-9H3m15.364-6.364L6.343 17.657m0-12.728l12.021 12.021" />
+            </svg>
+            <div class="absolute -bottom-2 -right-2 w-10 h-10 rounded-xl bg-white text-[#059669] shadow-lg flex items-center justify-center border-2 border-[#059669]">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.6" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+            </div>
+          </div>
+
+          <div class="text-center mt-1">
+            <span class="block text-sm font-black uppercase tracking-wider">Carregar XML</span>
+            <span class="block text-[11px] font-semibold text-emerald-100 mt-1 leading-tight">
+              Suba o arquivo XML para liberar o painel
+            </span>
+          </div>
+        </div>
+
+        <!-- ESTADO 3: ERRO NO UPLOAD (BOTÃO VERMELHO COM A MENSAGEM) -->
+        <div id="estadoUploadErro" class="hidden flex-col items-center justify-center gap-3 w-full">
+          <div class="relative flex items-center justify-center w-20 h-20 rounded-2xl bg-white/20 border-2 border-white/40 shadow-inner">
+            <svg class="w-12 h-12 text-white animate-spin-error" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </div>
+
+          <div class="text-center mt-1 px-1">
+            <span class="block text-xs font-black uppercase tracking-wider text-white">Erro ao Processar XML</span>
+            <span id="textoErroBotao" class="block text-[10px] font-medium text-red-100 mt-1 leading-tight">
+              Nenhum registro da zona TERMO SSA 01 encontrado.
+            </span>
+            <span class="block text-[9px] font-bold text-white/80 mt-2 uppercase tracking-wide bg-black/20 py-1 px-2 rounded-md">
+              Clique para tentar outro arquivo
+            </span>
+          </div>
+        </div>
+
+        <!-- ESTADO 2: PROCESSANDO POR CIMA DO VERDE COM BARRA DE PROGRESSO + PORCENTAGEM -->
+        <div id="estadoUploadLoading" class="hidden flex-col items-center justify-center gap-3 w-full">
+          <div class="w-24 h-24 rounded-2xl bg-white shadow-xl border-2 border-blue-100 flex items-center justify-center p-4">
+            <svg class="w-16 h-16 text-sky-400 animate-spin-slow" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v18m9-9H3m15.364-6.364L6.343 17.657m0-12.728l12.021 12.021" />
+            </svg>
+          </div>
+
+          <div class="bg-white w-full px-3.5 py-2 rounded-xl shadow-lg border border-blue-100 text-center">
+            <p class="text-xs font-black text-[#173376] uppercase tracking-wider">Processando XML...</p>
+            <p id="loadingSubStatus" class="text-[10px] text-slate-500 font-semibold mt-0.5">Filtrando zona TERMO SSA 01</p>
+          </div>
+
+          <!-- Barra de Progresso com Porcentagem Logo Abaixo -->
+          <div class="w-full px-1">
+            <div class="w-full h-3 bg-emerald-950/60 rounded-full overflow-hidden border border-white/30 shadow-inner p-0.5">
+              <div id="progressBarFill" class="h-full bg-white rounded-full transition-all duration-150 ease-out" style="width: 0%;"></div>
+            </div>
+            <div class="flex items-center justify-between text-[11px] font-extrabold text-white mt-1 px-0.5">
+              <span id="progressLabel" class="text-emerald-100">Lendo arquivo...</span>
+              <span id="progressPercent" class="tabular-nums bg-emerald-950/50 px-2 py-0.5 rounded-md border border-white/20">0%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- NOME DO DESENVOLVEDOR LOGO ABAIXO DO BOTÃO DE UPLOAD -->
+      <footer class="text-center text-[11px] font-semibold text-emerald-200/90 uppercase tracking-wider mt-1 drop-shadow-sm">
+        Desenvolvido por Luis Roberto dos Anjos Braga
+      </footer>
+    </div>
+  </div>
+
+  <!-- MODAL DE ERRO -->
+  <div id="errorModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl border-2 border-red-500 w-full max-w-md p-6 flex flex-col items-center text-center gap-4">
+      <div class="w-20 h-20 rounded-full bg-red-100 border-4 border-red-500 flex items-center justify-center shadow-inner">
+        <svg class="w-10 h-10 text-red-600 animate-spin-error" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </div>
+      <div>
+        <h3 class="text-base font-extrabold text-red-700 uppercase tracking-wide">Erro ao Processar XML</h3>
+        <p id="errorModalMessage" class="text-xs text-slate-600 font-medium mt-1">Ocorreu uma falha ao ler o arquivo.</p>
+      </div>
+      <button type="button" onclick="fecharModalErro()" class="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-extrabold uppercase transition shadow-md cursor-pointer">
+        Entendido
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL DE DETALHES DA LOJA -->
+  <div id="modalLoja" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl border border-slate-300 w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+      <div class="bg-gradient-to-r from-[#1e3f8f] to-[#173376] text-white px-5 py-3.5 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-white font-bold">📦</div>
+          <div>
+            <h3 id="modalTituloLoja" class="text-sm font-extrabold uppercase tracking-wide">Detalhes da Loja</h3>
+            <p id="modalSubtituloRota" class="text-[11px] text-blue-200 font-medium">Rota: ---</p>
+          </div>
+        </div>
+        <button type="button" onclick="fecharModalLoja()" class="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white font-bold transition cursor-pointer">✕</button>
+      </div>
+      <div class="bg-slate-50 px-5 py-3 border-b border-slate-200 grid grid-cols-2 gap-4">
+        <div class="bg-white p-2.5 rounded-lg border border-slate-200 shadow-xs flex items-center justify-between">
+          <span class="text-[11px] font-bold text-slate-500 uppercase">Total de Unidades</span>
+          <span id="modalTotalUnidades" class="text-sm font-extrabold text-[#173376]">0</span>
+        </div>
+        <div class="bg-white p-2.5 rounded-lg border border-slate-200 shadow-xs flex items-center justify-between">
+          <span class="text-[11px] font-bold text-slate-500 uppercase">Total de Caixas</span>
+          <span id="modalTotalCaixas" class="text-sm font-extrabold text-amber-700">0 CX</span>
+        </div>
+      </div>
+      <div class="overflow-y-auto flex-1 p-4">
+        <table class="cd-table w-full text-center border-collapse">
+          <thead>
+            <tr>
+              <th class="w-10 text-center">#</th>
+              <th>PRODUTO</th>
+              <th class="text-right">QTD</th>
+            </tr>
+          </thead>
+          <tbody id="modalTbodyItens"></tbody>
+        </table>
+      </div>
+      <div class="bg-slate-100 px-5 py-3 border-t border-slate-200 flex justify-end">
+        <button type="button" onclick="fecharModalLoja()" class="px-4 py-1.5 rounded-lg bg-[#173376] hover:bg-blue-900 text-white text-xs font-bold uppercase transition cursor-pointer">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE NÚMEROS DAS CAIXAS -->
+  <div id="modalCaixas" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl border border-slate-300 w-full max-w-md overflow-hidden">
+      <div class="bg-gradient-to-r from-amber-600 to-amber-700 text-white px-5 py-3.5 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center font-bold">📦</div>
+          <div>
+            <h3 id="modalCaixasTitulo" class="text-sm font-extrabold uppercase tracking-wide">Caixas da Loja</h3>
+            <p id="modalCaixasSub" class="text-[11px] text-amber-100 font-medium">Números das etiquetas</p>
+          </div>
+        </div>
+        <button type="button" onclick="fecharModalCaixas()" class="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white font-bold transition cursor-pointer">✕</button>
+      </div>
+      <div class="p-5">
+        <p class="text-xs font-bold text-slate-500 uppercase mb-3">Volumes / Etiquetas separadas para esta loja:</p>
+        <div id="listaNumerosCaixas" class="flex flex-wrap gap-2"></div>
+      </div>
+      <div class="bg-slate-100 px-5 py-3 border-t border-slate-200 flex justify-end">
+        <button type="button" onclick="fecharModalCaixas()" class="px-4 py-1.5 rounded-lg bg-amber-700 hover:bg-amber-800 text-white text-xs font-bold uppercase transition cursor-pointer">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAINEL PRINCIPAL -->
+  <div id="painelPrincipalContainer" class="min-w-[1180px] max-w-[1920px] mx-auto flex flex-col gap-2">
+
+    <!-- HEADER -->
+    <header class="bg-white border border-slate-300 rounded-[10px] px-4 py-2.5 shadow-[0_4px_12px_rgba(15,23,42,0.07)] flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <!-- ÍCONE DO PAINEL (FLOCO DE NEVE CLICÁVEL PARA SUBIR NOVO XML) -->
+        <button
+          type="button"
+          onclick="document.getElementById('xmlInput').click()"
+          title="Clique no floco de neve para carregar um novo arquivo XML"
+          class="group w-10 h-10 rounded-lg bg-[#173376] hover:bg-blue-900 active:scale-95 text-white flex items-center justify-center shrink-0 shadow-sm transition cursor-pointer relative"
+        >
+          <svg class="w-5 h-5 text-sky-400 group-hover-spin" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v18m9-9H3m15.364-6.364L6.343 17.657m0-12.728l12.021 12.021" />
+          </svg>
+        </button>
+        <div>
+          <h1 class="text-sm sm:text-base font-extrabold tracking-tight text-[#173376] uppercase">
+            Painel Operacional CD — TERMO SSA 01
+          </h1>
+          <p id="statusArquivo" class="text-[11px] font-medium text-slate-500">
+            Aguardando importação de dados...
+          </p>
+        </div>
+      </div>
+
+      <!-- Pedido e Data -->
+      <div class="px-3 py-1.5 rounded-lg bg-red-50 border-2 border-red-500 flex items-center gap-3 shadow-sm">
+        <div class="flex flex-col">
+          <span class="text-[9px] font-extrabold uppercase tracking-wider text-red-600">Pedido / Sequencial</span>
+          <strong id="badgePedido" class="text-xs font-black text-red-700 tracking-wide">---</strong>
+        </div>
+        <div class="w-px h-6 bg-red-200"></div>
+        <div class="flex flex-col">
+          <span class="text-[9px] font-extrabold uppercase tracking-wider text-red-600">Data / Arquivo</span>
+          <strong id="badgeData" class="text-xs font-black text-red-700 tracking-wide">---</strong>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <div class="px-3 py-1 rounded-lg bg-slate-100 border border-slate-200 flex items-center gap-2">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Lojas</span>
+          <strong id="kpiLojas" class="text-sm font-extrabold text-[#173376] tabular-nums">0</strong>
+        </div>
+        <div class="px-3 py-1 rounded-lg bg-slate-100 border border-slate-200 flex items-center gap-2">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Rotas</span>
+          <strong id="kpiRotas" class="text-sm font-extrabold text-[#059669] tabular-nums">0</strong>
+        </div>
+        <div class="px-3 py-1 rounded-lg bg-slate-100 border border-slate-200 flex items-center gap-2">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Unidades</span>
+          <strong id="kpiUnidades" class="text-sm font-extrabold text-slate-900 tabular-nums">0</strong>
+        </div>
+        <div class="px-3 py-1 rounded-lg bg-red-50 border border-red-200 flex items-center gap-2">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-[#dc2626]">Total Caixas</span>
+          <strong id="kpiCaixas" class="text-sm font-extrabold text-[#dc2626] tabular-nums">0</strong>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 shrink-0">
+        <!-- BOTÃO RELATÓRIO CAP TSSA01 -->
+        <button type="button" onclick="imprimirRelatorioCap()" class="h-9 px-3 rounded-lg bg-[#173376] hover:bg-blue-900 text-white text-xs font-extrabold uppercase tracking-wide transition cursor-pointer shadow-sm flex items-center gap-1.5" title="Imprimir Relatório CAP TSSA01">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6v-8z" />
+          </svg>
+          RELATÓRIO CAP. TSSA01
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Grid -->
+    <main class="four-panels-grid">
+
+      <!-- PAINEL 1 -->
+      <section id="secaoPainel1" class="cd-card">
+        <div class="cd-panel-header">
+          <div class="flex items-center justify-center gap-2 flex-wrap w-full">
+            <button type="button" id="btnImprimirTopo" onclick="imprimirTop20()" class="h-7 px-3 rounded bg-white/15 hover:bg-white/25 text-white text-[11px] font-extrabold uppercase tracking-wide transition cursor-pointer flex items-center gap-1.5 shrink-0 shadow-xs" title="Imprimir Relatório Top 20">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6v-8z" />
+              </svg>
+              Imprimir
+            </button>
+            <select id="filtroProduto" onchange="renderizarPainel1()" class="cd-header-control min-w-[180px] max-w-[280px] truncate shrink-0">
+              <option value="TODOS">TODOS OS PRODUTOS</option>
+              <option value="GRUPO_GLP1">⚡ APENAS GRUPO GLP-1</option>
+            </select>
+          </div>
+          <h2 id="tituloPainel1Header" class="text-xs font-extrabold uppercase tracking-wide text-center mt-0.5">TOP 20 LOJAS &amp; ROTAS</h2>
+        </div>
+        
+        <div class="print-header-only">
+          <h1 id="printTituloRelatorio" class="text-sm font-black text-[#173376] uppercase">RELATÓRIO TOP 20 LOJAS</h1>
+          <p class="text-[10px] text-slate-600 font-semibold mt-0.5">ZONA: TERMO SSA 01 • PEDIDO: <span id="printBadgePedido">---</span></p>
+        </div>
+
+        <div class="overflow-y-auto flex-1">
+          <table class="cd-table w-full text-center border-collapse">
+            <thead>
+              <tr>
+                <th class="w-10 text-center">#</th>
+                <th class="sortable text-center" onclick="alternarOrdenacao('p1', 'loja')">LOJA <span class="opacity-75">↕</span></th>
+                <th class="sortable text-center" onclick="alternarOrdenacao('p1', 'rota')">ROTA <span class="opacity-75">↕</span></th>
+                <th class="sortable text-center" onclick="alternarOrdenacao('p1', 'qtd')">QTD <span class="opacity-75">↕</span></th>
+                <th class="sortable text-center" onclick="alternarOrdenacao('p1', 'caixas')">CAIXAS <span class="opacity-75">↕</span></th>
+              </tr>
+            </thead>
+            <tbody id="tbodyPainel1">
+              <tr><td colspan="5" class="py-10 text-center text-slate-400 italic">Aguardando importação de dados...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- PAINEL 2 -->
+      <section class="cd-card">
+        <div class="cd-panel-header">
+          <h2 class="text-xs font-extrabold uppercase tracking-wide whitespace-nowrap">TOP 10 PRODUTOS</h2>
+          <span id="badgeSkus" class="px-2 py-0.5 rounded bg-white text-[#173376] text-[11px] font-extrabold uppercase">0 SKUs</span>
+        </div>
+        <div class="overflow-y-auto flex-1">
+          <table class="cd-table w-full text-center border-collapse">
+            <thead>
+              <tr>
+                <th class="w-10 text-center">#</th>
+                <th class="sortable" onclick="alternarOrdenacao('p2', 'produto')">PRODUTO <span class="opacity-75">↕</span></th>
+                <th class="sortable text-right" onclick="alternarOrdenacao('p2', 'lojas')">LOJAS <span class="opacity-75">↕</span></th>
+                <th class="sortable text-right" onclick="alternarOrdenacao('p2', 'qtd')">SAÍDA <span class="opacity-75">↕</span></th>
+              </tr>
+            </thead>
+            <tbody id="tbodyPainel2">
+              <tr><td colspan="4" class="py-10 text-center text-slate-400 italic">Aguardando importação de dados...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- PAINEL 3 -->
+      <section class="cd-card">
+        <div class="cd-panel-header">
+          <h2 id="tituloPainel3" class="text-xs font-extrabold uppercase tracking-wide whitespace-nowrap">TODAS AS LOJAS (0)</h2>
+          <input type="text" id="buscaLojaResumo" oninput="renderizarPainel3()" placeholder="Buscar loja/rota..." class="cd-header-control w-36" />
+        </div>
+        <div class="overflow-y-auto flex-1">
+          <table class="cd-table w-full text-center border-collapse">
+            <thead>
+              <tr>
+                <th class="sortable" onclick="alternarOrdenacao('p3', 'loja')">LOJA <span class="opacity-75">↕</span></th>
+                <th class="sortable" onclick="alternarOrdenacao('p3', 'rota')">ROTA <span class="opacity-75">↕</span></th>
+                <th class="sortable text-right" onclick="alternarOrdenacao('p3', 'totalItens')">QTD <span class="opacity-75">↕</span></th>
+                <th class="sortable text-right" onclick="alternarOrdenacao('p3', 'totalCaixas')">CAIXAS <span class="opacity-75">↕</span></th>
+              </tr>
+            </thead>
+            <tbody id="tbodyPainel3">
+              <tr><td colspan="4" class="py-10 text-center text-slate-400 italic">Aguardando importação de dados...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="bg-[#059669] text-white px-3 py-2 text-xs font-extrabold uppercase tracking-wide flex items-center justify-between border-t border-emerald-700">
+          <span>QTD. TOTAL CAIXAS CONSOLIDADAS:</span>
+          <span id="footerTotalCaixas" class="text-sm font-black tabular-nums">0 CX</span>
+        </div>
+      </section>
+
+      <!-- PAINEL 4 -->
+      <section class="cd-card">
+        <div class="cd-panel-header">
+          <h2 class="text-xs font-extrabold uppercase tracking-wide whitespace-nowrap">DETALHE POR LOJA</h2>
+          <input type="text" id="buscaDetalhe" oninput="renderizarPainel4()" placeholder="Filtrar loja/item..." class="cd-header-control w-36" />
+        </div>
+        <div class="overflow-y-auto flex-1">
+          <table class="cd-table w-full text-center border-collapse">
+            <thead>
+              <tr>
+                <th class="sortable" onclick="alternarOrdenacao('p4', 'loja')">LOJA <span class="opacity-75">↕</span></th>
+                <th class="sortable" onclick="alternarOrdenacao('p4', 'rota')">ROTA <span class="opacity-75">↕</span></th>
+                <th class="sortable" onclick="alternarOrdenacao('p4', 'produto')">PRODUTO <span class="opacity-75">↕</span></th>
+                <th class="sortable text-right" onclick="alternarOrdenacao('p4', 'qtdProd')">QTD <span class="opacity-75">↕</span></th>
+                <th class="sortable text-right" onclick="alternarOrdenacao('p4', 'caixasLoja')">CX. LOJA <span class="opacity-75">↕</span></th>
+              </tr>
+            </thead>
+            <tbody id="tbodyPainel4">
+              <tr><td colspan="5" class="py-10 text-center text-slate-400 italic">Nenhum registro.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- RODAPÉ APENAS DOS PAINÉIS PRINCIPAIS -->
+    <footer class="text-center py-1 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+      Desenvolvido por Luis Roberto dos Anjos Braga
+    </footer>
+  </div>
+
+  <!-- RELATÓRIO CAP EXATO (GRADE 5x2 HORIZONTAL EM 1 PÁGINA) -->
+  <div id="printRelatorioCapContainer">
+    <div class="report-container">
+      <div class="capital-title">CAPITAL</div>
+      <div id="capHeaderInfo" class="report-header-box">
+        TERMO SSA DIA --/--/---- – ---------
+      </div>
+      <div class="report-grid" id="capRoutesGrid">
+        <!-- Preenchido dinamicamente via JavaScript -->
+      </div>
+      <div class="doc-footer">
+        FARMÁCIAS PAGUE MENOS — DOCUMENTO DE USO INTERNO
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const CONFIG_TAGS = {
+      loja: ['FILIAL', 'LOJA', 'COD_FILIAL', 'DESTINO', 'CLIENTE', 'NOME_LOJA', 'PEDIDO_CD'],
+      rota: ['ROTA', 'COD_ROTA', 'LINHA', 'ITINERARIO', 'DESCRICAO_ROTA', 'DESCRICAO_ZONA', 'ZONA'],
+      produto: ['DESCRIÇÃO_DO_PRODUTO', 'DESCRICAO_DO_PRODUTO', 'DESC_PRODUTO', 'DESCRICAO', 'PRODUTO', 'ITEM', 'NOME_PRODUTO', 'SKU'],
+      quantidade: ['QUANTIDADE_CAIXA', 'QUANTIDADE', 'QTD', 'QTDE', 'UNIDADES', 'QTD_PEDIDA', 'QTD_SEPARADA'],
+      caixaId: ['CAIXA', 'NUM_CAIXA', 'VOLUME', 'ETQ_CAIXA'],
+      caixasQtd: ['CAIXAS', 'QTD_CAIXAS', 'VOLUMES', 'CX', 'TOTAL_CAIXAS', 'QTD_VOLUMES'],
+      zona: ['DESCRIÇÃO_ZONA', 'DESCRICAO_ZONA', 'ZONA'],
+      pedido: ['PEDIDO', 'NUM_PEDIDO', 'PEDIDO_CD'],
+      sequencial: ['SEQUENCIAL', 'SEQ'],
+      data: ['DATA', 'DT_EMISSAO', 'DATA_PEDIDO', 'DT_GERACAO']
+    };
+
+    const KEYWORDS_GLP1 = ['OZEMPIC', 'WEGOVY', 'RYBELSUS', 'SEMAVY', 'SAXENDA', 'VICTOZA', 'MOUNJARO', 'TRULICITY', 'EXTENSIOR', 'POVIZTRA'];
+
+    let registrosGlobais = [];
+    let resumoLojasGlobal = [];
+    let todasLojasCdGlobal = [];
+    let painelLiberado = false;
+    let isCarregandoXml = false;
+    let progressoInterval = null;
+
+    const estadoOrdenacao = {
+      p1: { campo: 'qtd', asc: false },
+      p2: { campo: 'qtd', asc: false },
+      p3: { campo: 'rota', asc: true },
+      p4: { campo: 'loja', asc: true }
+    };
+
+    function calcularDataDoPedido(pedidoStr) {
+      if (!pedidoStr) return null;
+      const base = String(pedidoStr).split('-')[0].trim();
+      if (base.length < 5) return null;
+      
+      const anoStr = base.substring(0, 4);
+      const diasStr = base.substring(4);
+      
+      const ano = parseInt(anoStr, 10);
+      const diaDoAno = parseInt(diasStr, 10);
+      
+      if (isNaN(ano) || isNaN(diaDoAno)) return null;
+      
+      const bissexto = (ano % 4 === 0 && ano % 100 !== 0) || (ano % 400 === 0);
+      const diasMes = [31, bissexto ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      
+      let mes = 0;
+      let dia = diaDoAno;
+      
+      if (dia <= 0 || dia > (bissexto ? 366 : 365)) return null;
+      
+      for (let i = 0; i < diasMes.length; i++) {
+        if (dia <= diasMes[i]) {
+          mes = i + 1;
+          break;
+        }
+        dia -= diasMes[i];
+      }
+      
+      const diaFmt = String(dia).padStart(2, '0');
+      const mesFmt = String(mes).padStart(2, '0');
+      return `${diaFmt}/${mesFmt}/${ano}`;
+    }
+
+    function ehProdutoGlp1(nomeProduto) {
+      return KEYWORDS_GLP1.some(kw => nomeProduto.toUpperCase().includes(kw));
+    }
+
+    function atualizarProgressoVisual(porcentagem, textoStatus) {
+      const pct = Math.min(100, Math.max(0, Math.round(porcentagem)));
+      document.getElementById('progressBarFill').style.width = `${pct}%`;
+      document.getElementById('progressPercent').textContent = `${pct}%`;
+      if (textoStatus) {
+        document.getElementById('progressLabel').textContent = textoStatus;
+      }
+    }
+
+    function ativarTelaCarregamentoVerde() {
+      isCarregandoXml = true;
+      const overlay = document.getElementById('uploadLockOverlay');
+      const card = document.getElementById('btnUploadInicial');
+      overlay.classList.remove('hidden');
+      
+      card.classList.remove('bg-[#dc2626]', 'hover:bg-red-700', 'border-red-300/60', 'shadow-[0_20px_50px_rgba(220,38,38,0.45)]');
+      card.classList.add('bg-[#059669]', 'hover:bg-emerald-600', 'border-emerald-300/60', 'shadow-[0_20px_50px_rgba(5,150,105,0.45)]');
+
+      card.classList.remove('cursor-pointer');
+      card.classList.add('cursor-wait');
+
+      document.getElementById('estadoUploadIdle').classList.add('hidden');
+      document.getElementById('estadoUploadErro').classList.add('hidden');
+      document.getElementById('estadoUploadErro').classList.remove('flex');
+      
+      document.getElementById('estadoUploadLoading').classList.remove('hidden');
+      document.getElementById('estadoUploadLoading').classList.add('flex');
+
+      atualizarProgressoVisual(8, 'Lendo XML...');
+    }
+
+    function restaurarTelaUploadVerde() {
+      isCarregandoXml = false;
+      if (progressoInterval) clearInterval(progressoInterval);
+      const card = document.getElementById('btnUploadInicial');
+      card.classList.add('cursor-pointer', 'hover:bg-emerald-600');
+      card.classList.remove('cursor-wait');
+
+      document.getElementById('estadoUploadLoading').classList.add('hidden');
+      document.getElementById('estadoUploadLoading').classList.remove('flex');
+    }
+
+    function mostrarErro(msg) {
+      isCarregandoXml = false;
+      if (progressoInterval) clearInterval(progressoInterval);
+      
+      const overlay = document.getElementById('uploadLockOverlay');
+      const card = document.getElementById('btnUploadInicial');
+      overlay.classList.remove('hidden');
+
+      card.classList.remove('bg-[#059669]', 'hover:bg-emerald-600', 'border-emerald-300/60', 'shadow-[0_20px_50px_rgba(5,150,105,0.45)]', 'cursor-wait');
+      card.classList.add('bg-[#dc2626]', 'hover:bg-red-700', 'border-red-300/60', 'shadow-[0_20px_50px_rgba(220,38,38,0.45)]', 'cursor-pointer');
+
+      document.getElementById('estadoUploadLoading').classList.add('hidden');
+      document.getElementById('estadoUploadLoading').classList.remove('flex');
+      document.getElementById('estadoUploadIdle').classList.add('hidden');
+
+      document.getElementById('textoErroBotao').textContent = msg;
+      document.getElementById('estadoUploadErro').classList.remove('hidden');
+      document.getElementById('estadoUploadErro').classList.add('flex');
+    }
+
+    function fecharModalErro() {}
+
+    function abrirModalLoja(nomeLoja) {
+      const lojaObj = resumoLojasGlobal.find(l => l.loja === nomeLoja);
+      if (!lojaObj) return;
+
+      document.getElementById('modalTituloLoja').textContent = `Loja: ${lojaObj.loja}`;
+      document.getElementById('modalSubtituloRota').textContent = `Rota: ${lojaObj.rota}`;
+      document.getElementById('modalTotalUnidades').textContent = lojaObj.totalItens.toLocaleString('pt-BR');
+      document.getElementById('modalTotalCaixas').textContent = `${lojaObj.totalCaixas.toLocaleString('pt-BR')} CX`;
+
+      const tbody = document.getElementById('modalTbodyItens');
+      const produtosLista = Array.from(lojaObj.produtos.entries()).sort((a, b) => b[1] - a[1]);
+
+      tbody.innerHTML = produtosLista.map(([prod, qtd], idx) => `
+        <tr>
+          <td class="text-center font-bold text-slate-500">${idx + 1}</td>
+          <td class="font-semibold text-slate-900">${prod}</td>
+          <td class="text-right font-extrabold text-[#173376]">${qtd.toLocaleString('pt-BR')}</td>
+        </tr>
+      `).join('');
+
+      document.getElementById('modalLoja').classList.remove('hidden');
+    }
+
+    function fecharModalLoja() {
+      document.getElementById('modalLoja').classList.add('hidden');
+    }
+
+    function abrirModalCaixas(nomeLoja) {
+      const lojaObj = resumoLojasGlobal.find(l => l.loja === nomeLoja);
+      if (!lojaObj) return;
+
+      document.getElementById('modalCaixasTitulo').textContent = `Loja: ${lojaObj.loja}`;
+      document.getElementById('modalCaixasSub').textContent = `Rota: ${lojaObj.rota} • ${lojaObj.totalCaixas} volumes`;
+
+      const container = document.getElementById('listaNumerosCaixas');
+      
+      if (lojaObj.caixasSet.size === 0) {
+        container.innerHTML = `<span class="text-xs text-slate-500 italic">Nenhum número específico no XML.</span>`;
+      } else {
+        const caixasArr = Array.from(lojaObj.caixasSet).sort((a, b) => String(a).localeCompare(String(b), 'pt-BR', { numeric: true }));
+        container.innerHTML = caixasArr.map(numCx => `
+          <div class="px-3 py-2 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 font-black text-xs shadow-xs flex items-center gap-1.5">
+            <span>📦 Caixa</span>
+            <span class="text-sm font-extrabold text-amber-800 bg-white px-2 py-0.5 rounded border border-amber-200">${numCx}</span>
+          </div>
+        `).join('');
+      }
+
+      document.getElementById('modalCaixas').classList.remove('hidden');
+    }
+
+    function fecharModalCaixas() {
+      document.getElementById('modalCaixas').classList.add('hidden');
+    }
+
+    window.addEventListener('click', function(e) {
+      if (e.target === document.getElementById('modalLoja')) fecharModalLoja();
+      if (e.target === document.getElementById('modalCaixas')) fecharModalCaixas();
+      if (e.target === document.getElementById('errorModal')) fecharModalErro();
+    });
+
+    function alternarOrdenacao(painel, campo) {
+      if (estadoOrdenacao[painel].campo === campo) {
+        estadoOrdenacao[painel].asc = !estadoOrdenacao[painel].asc;
+      } else {
+        estadoOrdenacao[painel].campo = campo;
+        estadoOrdenacao[painel].asc = typeof campo === 'string' && !['qtd', 'caixas', 'lojas', 'totalItens', 'totalCaixas', 'qtdProd', 'caixasLoja'].includes(campo);
+      }
+      if (painel === 'p1') renderizarPainel1();
+      if (painel === 'p2') renderizarPainel2();
+      if (painel === 'p3') renderizarPainel3();
+      if (painel === 'p4') renderizarPainel4();
+    }
+
+    function ordenarLista(lista, campo, asc) {
+      return [...lista].sort((a, b) => {
+        const valA = a[campo];
+        const valB = b[campo];
+        if (typeof valA === 'number' && typeof valB === 'number') {
+          return asc ? valA - valB : valB - valA;
+        }
+        return asc
+          ? String(valA).localeCompare(String(valB), 'pt-BR', { numeric: true })
+          : String(valB).localeCompare(String(valA), 'pt-BR', { numeric: true });
+      });
+    }
+
+    function iniciarLeituraArquivo(file) {
+      if (!file || isCarregandoXml) return;
+
+      ativarTelaCarregamentoVerde();
+
+      let progressoSimulado = 10;
+      progressoInterval = setInterval(() => {
+        if (progressoSimulado < 88) {
+          progressoSimulado += Math.floor(Math.random() * 14) + 7;
+          if (progressoSimulado > 88) progressoSimulado = 88;
+          const etapa = progressoSimulado < 45 ? 'Lendo arquivo XML...' : progressoSimulado < 75 ? 'Filtrando TERMO SSA 01...' : 'Consolidando rotas...';
+          atualizarProgressoVisual(progressoSimulado, etapa);
+        }
+      }, 90);
+
+      const reader = new FileReader();
+      reader.onload = function (event) {
+        setTimeout(() => {
+          clearInterval(progressoInterval);
+          atualizarProgressoVisual(95, 'Finalizando painéis...');
+          setTimeout(() => {
+            processarXML(event.target.result, file.name);
+          }, 120);
+        }, 450);
+      };
+      reader.onerror = function () {
+        mostrarErro('Erro ao ler o arquivo XML.');
+      };
+      reader.readAsText(file, 'UTF-8');
+    }
+
+    document.getElementById('xmlInput').addEventListener('change', function (e) {
+      const file = e.target.files[0];
+      iniciarLeituraArquivo(file);
+      e.target.value = '';
+    });
+
+    const btnUploadInicial = document.getElementById('btnUploadInicial');
+    btnUploadInicial.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (!isCarregandoXml) btnUploadInicial.classList.add('scale-105', 'ring-4', 'ring-white/60');
+    });
+    btnUploadInicial.addEventListener('dragleave', () => {
+      btnUploadInicial.classList.remove('scale-105', 'ring-4', 'ring-white/60');
+    });
+    btnUploadInicial.addEventListener('drop', (e) => {
+      e.preventDefault();
+      btnUploadInicial.classList.remove('scale-105', 'ring-4', 'ring-white/60');
+      const file = e.dataTransfer.files[0];
+      iniciarLeituraArquivo(file);
+    });
+
+    function extrairValorTag(elemento, listaTags) {
+      const norm = s => s ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim() : '';
+      for (const tag of listaTags) {
+        const target = norm(tag);
+        if (elemento.attributes) {
+          for (const attr of Array.from(elemento.attributes)) {
+            if (norm(attr.name) === target && attr.value.trim() !== '') return attr.value.trim();
+          }
+        }
+        for (const filho of Array.from(elemento.children || [])) {
+          if (norm(filho.tagName) === target && filho.textContent.trim() !== '') return filho.textContent.trim();
+        }
+        let curr = elemento.parentElement, depth = 0;
+        while (curr && depth < 3) {
+          if (curr.attributes) {
+            for (const attr of Array.from(curr.attributes)) {
+              if (norm(attr.name) === target && attr.value.trim() !== '') return attr.value.trim();
+            }
+          }
+          curr = curr.parentElement;
+          depth++;
+        }
+      }
+      return null;
+    }
+
+    function processarXML(xmlString, nomeArquivo) {
+      setTimeout(() => {
+        try {
+          const parser = new DOMParser();
+          const xmlDoc = parser.parseFromString(xmlString, 'text/xml');
+
+          if (xmlDoc.getElementsByTagName('parsererror').length > 0) {
+            mostrarErro('Arquivo XML inválido ou malformado.');
+            return;
+          }
+
+          atualizarProgressoVisual(25, 'Analisando nós do XML...');
+
+          setTimeout(() => {
+            const todosElementos = Array.from(xmlDoc.getElementsByTagName('*'));
+            const itensExtraidos = [];
+            const mapaTodasLojasCd = new Map();
+            const pedidosUnicos = new Set();
+            const datasUnicas = new Set();
+
+            let index = 0;
+            const totalEl = todosElementos.length;
+            const chunkSize = 2000;
+
+            function processarChunk() {
+              const fim = Math.min(index + chunkSize, totalEl);
+              for (let i = index; i < fim; i++) {
+                const el = todosElementos[i];
+                const produto = extrairValorTag(el, CONFIG_TAGS.produto);
+                if (!produto) continue;
+                
+                let loja = extrairValorTag(el, CONFIG_TAGS.loja);
+                if (!loja) continue;
+
+                loja = String(loja).trim();
+
+                const zona = extrairValorTag(el, CONFIG_TAGS.zona) || '';
+                const rota = extrairValorTag(el, CONFIG_TAGS.rota) || 'SEM ROTA';
+                const qtdRaw = extrairValorTag(el, CONFIG_TAGS.quantidade) || '0';
+                const caixaId = extrairValorTag(el, CONFIG_TAGS.caixaId);
+                const cxQtdRaw = extrairValorTag(el, CONFIG_TAGS.caixasQtd);
+                const pedidoVal = extrairValorTag(el, CONFIG_TAGS.pedido);
+                const seqVal = extrairValorTag(el, CONFIG_TAGS.sequencial);
+                const dataVal = extrairValorTag(el, CONFIG_TAGS.data);
+
+                if (pedidoVal) {
+                  pedidosUnicos.add(seqVal ? `${pedidoVal}-${seqVal}` : pedidoVal);
+                }
+                if (dataVal) datasUnicas.add(dataVal);
+
+                if (!mapaTodasLojasCd.has(loja)) {
+                  mapaTodasLojasCd.set(loja, { loja, rota });
+                } else if (mapaTodasLojasCd.get(loja).rota === 'SEM ROTA' && rota !== 'SEM ROTA') {
+                  mapaTodasLojasCd.get(loja).rota = rota;
+                }
+
+                const itemObj = {
+                  loja,
+                  rota,
+                  produto,
+                  quantidade: parseFloat(String(qtdRaw).replace(',', '.')) || 0,
+                  caixaId,
+                  caixas: cxQtdRaw ? (parseFloat(String(cxQtdRaw).replace(',', '.')) || 0) : 0,
+                  zona
+                };
+
+                let atendeTermo = true;
+                if (zona) {
+                  const zonaNorm = zona.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+                  if (!zonaNorm.includes('TERMO SSA 01')) {
+                    atendeTermo = false;
+                  }
+                }
+
+                if (atendeTermo) {
+                  itensExtraidos.push(itemObj);
+                }
+              }
+
+              index = fim;
+              const progressoParcial = 25 + Math.round((index / totalEl) * 50);
+              atualizarProgressoVisual(progressoParcial, `Lendo registros (${index}/${totalEl})...`);
+
+              if (index < totalEl) {
+                setTimeout(processarChunk, 4);
+              } else {
+                setTimeout(() => {
+                  if (itensExtraidos.length === 0 && mapaTodasLojasCd.size === 0) {
+                    mostrarErro('Nenhum registro da zona TERMO SSA 01 encontrado no XML.');
+                    return;
+                  }
+
+                  registrosGlobais = itensExtraidos;
+                  todasLojasCdGlobal = Array.from(mapaTodasLojasCd.values());
+                  
+                  const pedidoStr = Array.from(pedidosUnicos).slice(0, 2).join(', ') || 'N/D';
+                  
+                  let dataCalculada = null;
+                  if (pedidosUnicos.size > 0) {
+                    const primeiroPedido = Array.from(pedidosUnicos)[0];
+                    dataCalculada = calcularDataDoPedido(primeiroPedido);
+                  }
+                  
+                  const dataFinal = dataCalculada || Array.from(datasUnicas)[0] || 'N/D';
+
+                  document.getElementById('badgePedido').textContent = pedidoStr;
+                  document.getElementById('printBadgePedido').textContent = pedidoStr;
+                  document.getElementById('badgeData').textContent = dataFinal;
+                  document.getElementById('statusArquivo').textContent = `Arquivo: ${nomeArquivo} • ${registrosGlobais.length.toLocaleString('pt-BR')} itens filtrados (TERMO SSA 01)`;
+
+                  document.getElementById('buscaLojaResumo').value = '';
+                  document.getElementById('buscaDetalhe').value = '';
+
+                  atualizarProgressoVisual(85, 'Consolidando painéis...');
+
+                  setTimeout(() => {
+                    consolidarDados();
+                    popularFiltroProdutos();
+                    atualizarKPIs();
+                    renderizarPainel1();
+                    renderizarPainel2();
+                    renderizarPainel3();
+                    renderizarPainel4();
+                    atualizarRelatorioCapDinamico(pedidoStr, dataFinal);
+
+                    atualizarProgressoVisual(100, 'Concluído!');
+                    setTimeout(() => {
+                      painelLiberado = true;
+                      document.getElementById('uploadLockOverlay').classList.add('hidden');
+                      restaurarTelaUploadVerde();
+                    }, 250);
+                  }, 50);
+
+                }, 50);
+              }
+            }
+
+            processarChunk();
+
+          }, 50);
+
+        } catch (err) {
+          mostrarErro('Erro ao processar: ' + err.message);
+        }
+      }, 50);
+    }
+
+    function consolidarDados() {
+      const mapaLojas = new Map();
+      registrosGlobais.forEach((reg) => {
+        if (!mapaLojas.has(reg.loja)) {
+          mapaLojas.set(reg.loja, {
+            loja: reg.loja,
+            rota: reg.rota,
+            totalItens: 0,
+            totalCaixasSomadas: 0,
+            caixasSet: new Set(),
+            produtos: new Map()
+          });
+        }
+        const d = mapaLojas.get(reg.loja);
+        d.totalItens += reg.quantidade;
+        d.totalCaixasSomadas += reg.caixas;
+        if (reg.caixaId) d.caixasSet.add(String(reg.caixaId));
+        d.produtos.set(reg.produto, (d.produtos.get(reg.produto) || 0) + reg.quantidade);
+      });
+
+      resumoLojasGlobal = Array.from(mapaLojas.values()).map((d) => ({
+        loja: d.loja,
+        rota: d.rota,
+        totalItens: d.totalItens,
+        totalCaixas: d.caixasSet.size > 0 ? d.caixasSet.size : (d.totalCaixasSomadas > 0 ? d.totalCaixasSomadas : 1),
+        produtos: d.produtos,
+        caixasSet: d.caixasSet
+      }));
+    }
+
+    function atualizarKPIs() {
+      const rotasUnicas = new Set(resumoLojasGlobal.map(l => l.rota));
+      const totalUnidades = resumoLojasGlobal.reduce((acc, l) => acc + l.totalItens, 0);
+      const totalCaixas = resumoLojasGlobal.reduce((acc, l) => acc + l.totalCaixas, 0);
+      const skusUnicos = new Set(registrosGlobais.map(r => r.produto));
+
+      document.getElementById('kpiLojas').textContent = resumoLojasGlobal.length.toLocaleString('pt-BR');
+      document.getElementById('kpiRotas').textContent = rotasUnicas.size.toLocaleString('pt-BR');
+      document.getElementById('kpiUnidades').textContent = totalUnidades.toLocaleString('pt-BR');
+      document.getElementById('kpiCaixas').textContent = totalCaixas.toLocaleString('pt-BR');
+      document.getElementById('badgeSkus').textContent = `${skusUnicos.size} SKUs`;
+      document.getElementById('footerTotalCaixas').textContent = `${totalCaixas.toLocaleString('pt-BR')} CX`;
+    }
+
+    function popularFiltroProdutos() {
+      const select = document.getElementById('filtroProduto');
+      const prods = Array.from(new Set(registrosGlobais.map(r => r.produto))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+      select.innerHTML = `<option value="TODOS">TODOS OS PRODUTOS</option><option value="GRUPO_GLP1">⚡ APENAS GRUPO GLP-1</option>`;
+      prods.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p;
+        opt.textContent = p;
+        select.appendChild(opt);
+      });
+    }
+
+    function renderizarPainel1() {
+      const selectEl = document.getElementById('filtroProduto');
+      const filtro = selectEl.value;
+      const textoSelecionado = selectEl.options[selectEl.selectedIndex].text.replace('⚡ APENAS ', '');
+      
+      const tituloDinamico = filtro === 'TODOS' ? 'TOP 20 LOJAS — GERAL' : `TOP 20 LOJAS — ${textoSelecionado}`;
+      document.getElementById('tituloPainel1Header').textContent = tituloDinamico;
+      document.getElementById('printTituloRelatorio').textContent = `RELATÓRIO ${tituloDinamico}`;
+
+      const tbody = document.getElementById('tbodyPainel1');
+      const mapa = new Map();
+
+      registrosGlobais.forEach(reg => {
+        let incluir = filtro === 'TODOS' ? true : (filtro === 'GRUPO_GLP1' ? ehProdutoGlp1(reg.produto) : reg.produto === filtro);
+        if (incluir) {
+          if (!mapa.has(reg.loja)) {
+            const lojaResumo = resumoLojasGlobal.find(l => l.loja === reg.loja);
+            mapa.set(reg.loja, { 
+              loja: reg.loja, 
+              rota: reg.rota, 
+              qtd: 0, 
+              caixas: lojaResumo ? lojaResumo.totalCaixas : 0 
+            });
+          }
+          mapa.get(reg.loja).qtd += reg.quantidade;
+        }
+      });
+
+      let top20 = Array.from(mapa.values()).filter(i => i.qtd > 0).sort((a, b) => b.qtd - a.qtd).slice(0, 20);
+      const { campo, asc } = estadoOrdenacao.p1;
+      if (campo !== 'qtd' || asc) top20 = ordenarLista(top20, campo, asc);
+
+      if (top20.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="py-10 text-center text-slate-400 italic">Nenhum registro encontrado.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = top20.map((item, idx) => {
+        const rankClass = idx === 0 ? 'bg-[#173376] text-white' : idx === 1 ? 'bg-blue-100 text-[#173376]' : idx === 2 ? 'bg-slate-200 text-slate-800' : 'bg-slate-100 text-slate-600';
+        return `
+          <tr>
+            <td class="text-center"><span class="inline-flex items-center justify-center w-6 h-5 rounded text-[11px] font-extrabold ${rankClass}">${idx + 1}º</span></td>
+            <td class="text-center">
+              <button type="button" onclick="abrirModalLoja('${item.loja}')" class="font-bold text-[#1e3f8f] hover:underline cursor-pointer">
+                ${item.loja}
+              </button>
+            </td>
+            <td class="text-center whitespace-nowrap">
+              <span class="inline-block px-2 py-0.5 rounded bg-emerald-50 text-[#059669] border border-emerald-200 text-[11px] font-bold">
+                ${item.rota}
+              </span>
+            </td>
+            <td class="text-center font-extrabold text-[#173376]">${item.qtd.toLocaleString('pt-BR')}</td>
+            <td class="text-center font-extrabold text-amber-800">${item.caixas.toLocaleString('pt-BR')} CX</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderizarPainel2() {
+      const tbody = document.getElementById('tbodyPainel2');
+      const mapa = new Map();
+
+      registrosGlobais.forEach(reg => {
+        if (!mapa.has(reg.produto)) mapa.set(reg.produto, { produto: reg.produto, qtd: 0, lojas: new Set() });
+        const p = mapa.get(reg.produto);
+        p.qtd += reg.quantidade;
+        p.lojas.add(reg.loja);
+      });
+
+      let top10 = Array.from(mapa.values()).map(p => ({ produto: p.produto, qtd: p.qtd, lojas: p.lojas.size })).sort((a, b) => b.qtd - a.qtd).slice(0, 10);
+      const { campo, asc } = estadoOrdenacao.p2;
+      if (campo !== 'qtd' || asc) top10 = ordenarLista(top10, campo, asc);
+
+      if (top10.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="py-10 text-center text-slate-400 italic">Aguardando dados...</td></tr>`;
+        return;
+      }
+
+      const maiorQtd = Math.max(...top10.map(i => i.qtd), 1);
+      tbody.innerHTML = top10.map((item, idx) => {
+        const pct = Math.max(8, Math.round((item.qtd / maiorQtd) * 100));
+        return `
+          <tr onclick="document.getElementById('filtroProduto').value='${item.produto.replace(/'/g, "\\'") }'; renderizarPainel1();" class="cursor-pointer group">
+            <td class="text-center font-extrabold text-slate-500">${idx + 1}º</td>
+            <td>
+              <div class="font-semibold text-slate-900 group-hover:text-[#173376] leading-tight">${item.produto}</div>
+              <div class="w-full bg-slate-200 h-1.5 rounded-full mt-1 overflow-hidden"><div class="bg-[#1e3f8f] h-full rounded-full" style="width: ${pct}%"></div></div>
+            </td>
+            <td class="text-right font-semibold text-slate-600">${item.lojas}</td>
+            <td class="text-right font-extrabold text-slate-900">${item.qtd.toLocaleString('pt-BR')}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderizarPainel3() {
+      const termo = document.getElementById('buscaLojaResumo').value.trim().toLowerCase();
+      const tbody = document.getElementById('tbodyPainel3');
+      let filtradas = resumoLojasGlobal.filter(l => l.loja.toLowerCase().includes(termo) || l.rota.toLowerCase().includes(termo));
+
+      document.getElementById('tituloPainel3').textContent = `TODAS AS LOJAS (${filtradas.length})`;
+      const { campo, asc } = estadoOrdenacao.p3;
+      filtradas = ordenarLista(filtradas, campo, asc);
+
+      if (filtradas.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="py-10 text-center text-slate-400 italic">Nenhuma loja encontrada.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtradas.map(l => `
+        <tr>
+          <td><button type="button" onclick="abrirModalLoja('${l.loja}')" class="font-bold text-[#1e3f8f] hover:underline cursor-pointer text-left">${l.loja}</button></td>
+          <td class="whitespace-nowrap"><span class="inline-block px-2 py-0.5 rounded bg-emerald-50 text-[#059669] border border-emerald-200 text-[11px] font-bold">${l.rota}</span></td>
+          <td class="text-right font-semibold text-slate-700">${l.totalItens.toLocaleString('pt-BR')}</td>
+          <td class="text-right whitespace-nowrap">
+            <button type="button" onclick="abrirModalCaixas('${l.loja}')" class="inline-block px-2.5 py-1 rounded bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 text-xs font-black transition cursor-pointer shadow-xs">
+              ${l.totalCaixas.toLocaleString('pt-BR')} CX
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function renderizarPainel4() {
+      const termo = document.getElementById('buscaDetalhe').value.trim().toLowerCase();
+      const tbody = document.getElementById('tbodyPainel4');
+      let linhas = [];
+
+      resumoLojasGlobal.forEach(lojaObj => {
+        lojaObj.produtos.forEach((qtdProd, nomeProd) => {
+          if (!termo || lojaObj.loja.toLowerCase().includes(termo) || lojaObj.rota.toLowerCase().includes(termo) || nomeProd.toLowerCase().includes(termo)) {
+            linhas.push({ loja: lojaObj.loja, rota: lojaObj.rota, produto: nomeProd, qtdProd, caixasLoja: lojaObj.totalCaixas });
+          }
+        });
+      });
+
+      const { campo, asc } = estadoOrdenacao.p4;
+      linhas = ordenarLista(linhas, campo, asc);
+
+      if (linhas.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="py-10 text-center text-slate-400 italic">Nenhum registro.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = linhas.map(item => `
+        <tr>
+          <td><button type="button" onclick="abrirModalLoja('${item.loja}')" class="font-bold text-[#1e3f8f] hover:underline cursor-pointer text-left">${item.loja}</button></td>
+          <td class="whitespace-nowrap"><span class="inline-block px-2 py-0.5 rounded bg-emerald-50 text-[#059669] border border-emerald-200 text-[11px] font-bold">${item.rota}</span></td>
+          <td class="font-medium text-slate-800">${item.produto}</td>
+          <td class="text-right font-extrabold text-[#173376]">${item.qtdProd.toLocaleString('pt-BR')}</td>
+          <td class="text-right whitespace-nowrap">
+            <button type="button" onclick="abrirModalCaixas('${item.loja}')" class="inline-block px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 text-xs font-bold transition cursor-pointer">
+              ${item.caixasLoja}
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function atualizarRelatorioCapDinamico(pedidoStr, dataStr) {
+      document.getElementById('capHeaderInfo').textContent = `TERMO SSA DIA ${dataStr || '17/11/2026'} – ${pedidoStr}`;
+      
+      const gridContainer = document.getElementById('capRoutesGrid');
+      gridContainer.innerHTML = '';
+
+      const mapaCaixasTermo = new Map();
+      resumoLojasGlobal.forEach(l => {
+        mapaCaixasTermo.set(l.loja, l.totalCaixas);
+      });
+
+      const rotasPermitidas = ['401', '402', '409', '410', '411', '412', '413', '414', '415', '416'];
+
+      let maxLojasEmUmaRota = 12;
+      rotasPermitidas.forEach(numRota => {
+        const count = todasLojasCdGlobal.filter(l => String(l.rota).includes(numRota)).length;
+        if (count > maxLojasEmUmaRota) {
+          maxLojasEmUmaRota = count;
+        }
+      });
+
+      const isCompacto = maxLojasEmUmaRota > 14;
+      const isSuperCompacto = maxLojasEmUmaRota > 18;
+      const fontSizeStyle = isSuperCompacto ? 'font-size: 6.5px; line-height: 1;' : (isCompacto ? 'font-size: 7px; line-height: 1.05;' : '');
+      const signHeightStyle = isSuperCompacto ? 'height: 14px;' : (isCompacto ? 'height: 16px;' : 'height: 20px;');
+
+      rotasPermitidas.forEach(numRota => {
+        const lojasDaRota = todasLojasCdGlobal
+          .filter(l => String(l.rota).includes(numRota))
+          .sort((a, b) => String(a.loja).localeCompare(String(b.loja), 'pt-BR', { numeric: true }));
+
+        const totalLinhasTabela = Math.max(12, lojasDaRota.length);
+        let linhasHtml = '';
+
+        for (let i = 0; i < totalLinhasTabela; i++) {
+          if (i < lojasDaRota.length) {
+            const l = lojasDaRota[i];
+            const caixasTermo = mapaCaixasTermo.has(l.loja) ? mapaCaixasTermo.get(l.loja) : 0;
+            linhasHtml += `
+              <tr style="${fontSizeStyle}">
+                <td>${l.loja}</td>
+                <td>${caixasTermo}</td>
+                <td></td>
+              </tr>
+            `;
+          } else {
+            linhasHtml += `
+              <tr style="${fontSizeStyle}">
+                <td>&nbsp;</td>
+                <td></td>
+                <td></td>
+              </tr>
+            `;
+          }
+        }
+
+        const boxHtml = `
+          <div class="route-table-box">
+            <div class="route-header">ROTA ${numRota}</div>
+            <table class="report-table" style="${fontSizeStyle}">
+              <thead>
+                <tr style="${fontSizeStyle}">
+                  <th class="col-filial">FILIAL</th>
+                  <th class="col-caixas">CAIXAS</th>
+                  <th class="col-obs">OBSERVAÇÃO</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${linhasHtml}
+              </tbody>
+            </table>
+            <div class="signature-box">
+              Ass. Responsável
+              <div class="signature-line" style="${signHeightStyle}"></div>
+            </div>
+          </div>
+        `;
+        gridContainer.insertAdjacentHTML('beforeend', boxHtml);
+      });
+    }
+
+    function imprimirRelatorioCap() {
+      if (!painelLiberado || todasLojasCdGlobal.length === 0) {
+        mostrarErro('Por favor, carregue um arquivo XML válido primeiro para gerar o relatório CAP.');
+        return;
+      }
+      document.body.classList.add('imprimindo-cap');
+      window.print();
+      setTimeout(() => {
+        document.body.classList.remove('imprimindo-cap');
+      }, 500);
+    }
+
+    function imprimirTop20() {
+      if (!painelLiberado || resumoLojasGlobal.length === 0) {
+        mostrarErro('Por favor, carregue um arquivo XML válido primeiro para imprimir o Top 20.');
+        return;
+      }
+      document.body.classList.add('imprimindo-top20');
+      window.print();
+      setTimeout(() => {
+        document.body.classList.remove('imprimindo-top20');
+      }, 500);
+    }
+  </script>
+</body>
+</html>
